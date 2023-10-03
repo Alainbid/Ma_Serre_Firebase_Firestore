@@ -179,8 +179,9 @@ void setup()
 //*********************************************************************
 void loop()
 {
+  unsigned long deb = consignes.frequence;//conversion int --> unsigned long
   if (Firebase.ready() && signupOK &&
-      ((debut) || (millis() - depart > consignes.frequence)))
+      ((debut) || (millis() - depart > deb)))
   // fin de la fréquence arrosage ... on arrose
   {
     debut = false;
