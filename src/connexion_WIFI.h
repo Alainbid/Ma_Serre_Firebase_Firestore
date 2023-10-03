@@ -14,7 +14,7 @@ public:
 ConWifi(){
   Serial.begin(115200);
  // WiFi.onEvent(WiFiEventStationModeConnected,WIFI_EVENT_STAMODE_CONNECTED);
-//  WiFi.onEvent(WiFiEventStationModeDisconnected,WIFI_EVENT_STAMODE_DISCONNECTED);
+ // WiFi.onEvent(WiFiEventStationModeDisconnected,WIFI_EVENT_STAMODE_DISCONNECTED);
  // WiFi.onEvent(WiFiEventGotIp,WIFI_EVENT_STAMODE_GOT_IP);
 
 
