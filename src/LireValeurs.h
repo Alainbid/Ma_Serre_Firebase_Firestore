@@ -15,7 +15,7 @@ DHTesp dht;
 String untexte = "*";
 double temperature = 0.0;
 double humidity = 0.0;
-bool debug = true;
+bool debug = false;
 
  void  LireDht() {
     // IO14 = D5 détection température humidité
@@ -53,6 +53,9 @@ bool debug = true;
       untexte.concat("  humidité = ");
       untexte.concat(humide);
       untexte.concat("%");
+      Serial.println();
+      Serial.println(untexte);
+      Serial.println();
     };//*********** fin de actualiser
 
 };
