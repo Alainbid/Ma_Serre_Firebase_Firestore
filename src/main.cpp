@@ -12,12 +12,11 @@
 #include <clocale>
 #include <string.h>
 #include <ArduinoJson.h>
-#include "LireLesConsignes.h"
 #include "connexion_WIFI.h"
 #include "Configurer_Date.h"
 #include "LireValeurs.h"
 //******* PROJET DE CONTROLE ESP8266 PAR WEB ET FIREBASE
-//******* Lecture des valeurs de frequence et duree dans FIREBASE
+//******* Lecture des consignes de frequence et duree dans FIREBASE
 //******* A chaque arrosage enregistrement date et freq dure temp hum
 //******* Interagit avec MASERREDERNIEREVERSION pour majour freq duree
 // Provide the token generation process info.
@@ -34,14 +33,17 @@
 #define DATABASE_URL "https://cfbconta.firebaseio.com"
 #define FIREBASE_PROJECT_ID "cfbconta"
 
-bool debug = true;
+bool debug = false;
 
-// Create an instance of the LireLesConsignes class
-
- LireLesConsignes lireconsignes;
+struct Consignes
+{
+  int frequence = 60000;
+  int duree = 2000;
+};
+Consignes consignes;
+bool LectureTerminee = false;
 
 LireValeurs actualise;
-
 
 const char *PARAM_INPUT_1 = "frequence";
 const char *PARAM_INPUT_2 = "duree";
@@ -64,8 +66,6 @@ unsigned long debut_Arrosage = 0;
 String documentPath = "serre";
 char quand[29];
 
-Consignes valeurs;
-LireLesConsignes  termine;
 
 //****************** ECRIRE  dans FIREBASE
 void ecriredb()
@@ -77,7 +77,7 @@ void ecriredb()
   }
 
   // lecturetempérature humidité dans ESP8266
-  actualise.LireDht();
+ // actualise.LireDht();
   actualise.actualiser();
   double temperature = actualise.temperature;
   double humidity = actualise.humidity;
@@ -95,12 +95,12 @@ void ecriredb()
   // création du fichier JSON contenant les données
   nouveau.set("fields/temperature/doubleValue", String(temperature).c_str());
   nouveau.set("fields/humidite/doubleValue", String(humidity).c_str());
-  double freq = valeurs.frequence / 3600000.0;
+  double freq = consignes.frequence / 3600000.0;
   // double freq = 1.1;
   // les frequences sont en millis conversion en h.
   nouveau.set("fields/frequence/doubleValue", freq);
   // les durée arrosage sont en millis conversion en mn
-  double dur = valeurs.duree / 60000.0;
+  double dur = consignes.duree / 60000.0;
   // double dur = 1.11 ;
   nouveau.set("fields/duree/doubleValue", dur);
   nouveau.set("fields/date/doubleValue", String(maintenant).c_str()); // date en millis
@@ -122,6 +122,57 @@ void ecriredb()
     Serial.println("**create ERREUR *******" + fbdo.errorReason());
   }
 } //****** fin ecriredb  **********************************************
+
+//*********  lire DB **************************************************
+
+bool lirelesconsignes()
+{
+  StaticJsonDocument<800> doc;
+  
+
+  if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", "consigner/consigne", content.raw()))
+  {
+    Serial.printf("Lecture === OK\n%s\n\n", fbdo.payload().c_str());
+    String l = fbdo.payload().c_str();
+    DeserializationError error = deserializeJson(doc, fbdo.payload().c_str());
+    Serial.printf("\n length = %d\n", sizeof(l));
+
+    // Test if parsing succeeds.
+    if (error)
+    {
+      Serial.print(F("deserializeJson() failed: "));
+      Serial.println(error.f_str());
+    }
+    else
+    {
+      String nom = doc["name"];
+      Serial.println(nom);
+      String no = doc["fields"];
+      Serial.println(no);
+      // durée est stockée en mn doit etre convertie en millis
+      double dur = doc["fields"]["duree"]["doubleValue"];
+      consignes.duree = dur * (60 * 1000);
+
+      // la frequence stockée en heure convertie en millis
+      double fre = doc["fields"]["frequence"]["doubleValue"];
+      consignes.frequence = fre * (60 * 60 * 1000); // en millis
+
+      Serial.printf("---------------- durée = %.1d millis\n", consignes.duree);
+      Serial.printf("---------------- fréquence = %.1d millis\n", consignes.frequence);
+      // date de la dernière mise à jour
+      String d = doc["createTime"];
+      Serial.println(d);
+      LectureTerminee = true;
+    }
+    return true;
+  }
+  else
+  {
+    Serial.println("*****Erreur consigne*********" + fbdo.errorReason());
+    return false;
+  }
+}
+//********* FIN  lire DB **************************************************
 
 //********  SETUP  ******************************************************************
 void setup()
@@ -166,16 +217,15 @@ void setup()
   Serial.printf("\nFirebase authenticated v%d\n\n", Firebase.authenticated());
 
   // Lire  Les Consignes dans firebase
-  lireconsignes.lirelesconsignes();
-  if (termine.LectureTerminee)
+  if ( lirelesconsignes())
   {
-    Serial.printf("---- durée = %.1d millis\n", valeurs.duree);
-    Serial.printf("---- fréquence = %.1d millis\n", valeurs.frequence);
+    Serial.printf("---- durée = %.1d millis\n", consignes.duree);
+    Serial.printf("---- fréquence = %.1d millis\n", consignes.frequence);
 
     if (debug)
     {
-      valeurs.duree = 10000;     // 10 seconde = 10000 millis
-      valeurs.frequence = 60000; // 1 mn = 60000 mills
+      consignes.duree = 10000;     // 10 seconde = 10000 millis
+      consignes.frequence = 60000; // 1 mn = 60000 mills
     }
   }
   else
@@ -188,7 +238,7 @@ void setup()
 //*********************************************************************
 void loop()
 {
-  unsigned long deb = valeurs.frequence; // conversion int --> unsigned long
+  unsigned long deb = consignes.frequence; // conversion int --> unsigned long
   if (Firebase.ready() && signupOK &&
       ((debut) || (millis() - depart > deb)))
   // fin de la fréquence arrosage ... on arrose
@@ -197,7 +247,7 @@ void loop()
     // début arrosage pour une durée de duree
     if (debug)
     {
-      snprintf(quand, 9, "%d", valeurs.duree / 1000); // duree arrosage en millisecondes ramenées en s
+      snprintf(quand, 9, "%d", consignes.duree / 1000); // duree arrosage en millisecondes ramenées en s
       Serial.printf("\ndans la boucle arrosage pour %s \n", quand);
     }
     digitalWrite(relai, HIGH); // arrosage
@@ -205,7 +255,7 @@ void loop()
     debut_Arrosage = millis(); // date du debut arosage
 
     // dans la boucle d'arrosage pendant durée arrosage
-    while (millis() < (debut_Arrosage + valeurs.duree))
+    while (millis() < (debut_Arrosage + consignes.duree))
     {
       Serial.print(".");
       delay(200);
@@ -223,12 +273,12 @@ void loop()
       ConWifi();
     }
 
-    // relire les valeurs de consignes
+    // relire les consignes de consignes
     //  au cas ou elles auraient été modifiées entre temps
     if (!debug)
-      LireLesConsignes lirelesconsignes();
+      lirelesconsignes();
 
-    // écriture des valeurs dans FIREBASE
+    // écriture des consignes dans FIREBASE
     ecriredb();
 
     // raz du compteur de fréquence arrosage

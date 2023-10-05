@@ -11,6 +11,7 @@ public :
 // DHT 22  (AM2302)
 DHTesp dht;
 
+ 
 
 String untexte = "*";
 double temperature = 0.0;
@@ -18,13 +19,15 @@ double humidity = 0.0;
 bool debug = false;
 
  void  LireDht() {
-    // IO14 = D5 détection température humidité
-        dht.setup(14, DHTesp::DHT22);
+  // IO14 = D5 détection température humidité
+   
+       
     }
  //*******ACTUALISER
   // lecture  température et humidité du DHT22
     void actualiser()
     {
+      dht.setup(14, DHTesp::DHT22);
       char temp[5];
       temperature = dht.getTemperature();
       dtostrf(temperature, 0, 1, temp);
@@ -39,6 +42,7 @@ bool debug = false;
       untexte.concat(" température = ");
       untexte.concat(temp);
       untexte.concat(" °C\n");
+      Serial.println(untexte);
 
       humidity = dht.getHumidity();
       char humide[5];
@@ -50,12 +54,11 @@ bool debug = false;
         Serial.println(humide);
         Serial.println();
       }
-      untexte.concat("  humidité = ");
+      untexte = '*';
+      untexte.concat(" humidité    = ");
       untexte.concat(humide);
-      untexte.concat("%");
-      Serial.println();
+      untexte.concat(" %\n");
       Serial.println(untexte);
-      Serial.println();
     };//*********** fin de actualiser
 
 };
