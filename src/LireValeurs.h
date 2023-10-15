@@ -30,7 +30,7 @@ bool debug = false;
       dht.setup(14, DHTesp::DHT22);
       char temp[5];
       temperature = dht.getTemperature();
-      dtostrf(temperature, 0, 1, temp);
+      dtostrf(temperature, 0, 1, temp);//valeur lue , zero = no padding, précision, conversion en string
       delay(200);
 
       if (debug)
